@@ -19,7 +19,7 @@ The system follows a structured pipeline to recognize and translate ASL gestures
 - Uses **MediaPipe** to detect and track **21 hand landmarks** (key points) in real time
 - Works efficiently even in **low-light conditions**
 
-### <img src="https://img.icons8.com/color/24/000000/feature.png"/> Feature Extraction
+###  Feature Extraction
 - Extracts **x and y coordinates** of the 21 landmarks (total **42 features**) from each video frame
 
 ### <img src="https://img.icons8.com/color/24/000000/artificial-intelligence.png"/> Gesture Classification
