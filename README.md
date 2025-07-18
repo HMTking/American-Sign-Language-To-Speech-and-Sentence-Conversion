@@ -63,8 +63,7 @@ The system follows a structured pipeline to recognize and translate ASL gestures
 
 ---
 
-## ▶️ How to Run Th
-is Project
+## ▶️ How to Run This Project
 
 Follow these steps to set up and run the ASL Detection System:
 
