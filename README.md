@@ -1,4 +1,4 @@
-# <img src="https://img.icons8.com/color/48/000000/sign-language.png" alt="ASL Icon"/> American Sign Language (ASL) Detection System
+# American Sign Language (ASL) Detection System
 
 <div align="center">
   <img src="https://img.shields.io/badge/Python-3.8+-blue?logo=python" alt="Python"/>
@@ -26,10 +26,10 @@ The system follows a structured pipeline to recognize and translate ASL gestures
 - A **Multi-Layer Perceptron (MLP)** neural network classifies hand poses into **ASL letters (A-Z)**
 - Trained on **87,000+ ASL images** and **10,000+ finger-spelling videos** for high accuracy
 
-### <img src="https://img.icons8.com/color/24/000000/speech-to-text.png"/> Sentence Formation
+###  Sentence Formation
 - Recognized letters are combined into **words and full sentences** using NLP
 
-### <img src="https://img.icons8.com/color/24/000000/voice.png"/> Speech Conversion
+###  Speech Conversion
 - **Google Text-to-Speech (gTTS)** converts text into **natural-sounding speech**
 
 ---
