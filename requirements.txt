@@ -1,0 +1,6 @@
+gtts
+pygame
+opencv-python
+mediapipe
+numpy
+tensorflow

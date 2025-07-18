@@ -63,7 +63,49 @@ The system follows a structured pipeline to recognize and translate ASL gestures
 
 ---
 
+## ▶️ How to Run Th
+is Project
+
+Follow these steps to set up and run the ASL Detection System:
+
+### 1. Clone the Repository
+```sh
+git clone <repo-url>
+cd American-Sign-Language-To-Speech-and-Sentence-Conversion
+```
+
+### 2. Create and Activate Virtual Environment
+
+#### **Windows**
+```sh
+python -m venv venv
+venv\Scripts\activate
+```
+
+#### **Mac/Linux**
+```sh
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. Install Requirements
+```sh
+pip install -r requirements.txt
+```
+
+### 4. Run the Project
+```sh
+python main.py
+```
+or (Mac/Linux)
+```sh
+python3 main.py
+```
+
+---
+
 <div align="center">
   <h3>📜 Acknowledgments</h3>
   <p>Special thanks to the faculty of <b>IIIT Surat</b> for their guidance and support.</p>
 </div>
+

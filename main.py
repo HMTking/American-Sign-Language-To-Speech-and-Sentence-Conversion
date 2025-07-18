@@ -81,6 +81,9 @@ def get_args():
     return parser.parse_args()
 
 def main():
+    # Add greeting sentence voice output at start
+    speak_text("welcome to ASL project By Datt Patel")
+
     args = get_args()
     cap = cv.VideoCapture(args.device)
     cap.set(cv.CAP_PROP_FRAME_WIDTH, args.width)
