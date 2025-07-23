@@ -14,8 +14,8 @@ import cv2 as cv
 import numpy as np
 import mediapipe as mp
 
-from utils.cvfpscalc import CvFpsCalc
-from model.keypoint_classifier.keypoint_classifier import KeyPointClassifier
+from src.utils.cvfpscalc import CvFpsCalc
+from src.model.keypoint_classifier.keypoint_classifier import KeyPointClassifier
 
 # Speech queue to prevent overlapping audio
 speech_queue = Queue()
@@ -121,7 +121,7 @@ def main():
 
     classifier = KeyPointClassifier()
     
-    with open("model/keypoint_classifier/keypoint_classifier_label.csv", encoding="utf-8-sig") as f:
+    with open("src/model/keypoint_classifier/keypoint_classifier_label.csv", encoding="utf-8-sig") as f:
         labels = [row[0] for row in csv.reader(f)]
     
     fps_calc = CvFpsCalc(buffer_len=10)
@@ -394,7 +394,7 @@ def logging_csv(number, mode, landmark_list):
     if mode == 0:
         pass
     if (mode == 1 or mode == 2) and (0 <= number <= 35):
-        csv_path = "model/keypoint_classifier/keypoint.csv"
+        csv_path = "src/model/keypoint_classifier/keypoint.csv"
         with open(csv_path, "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([number, *landmark_list])
