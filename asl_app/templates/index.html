@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ASL Detection System — Sign to Speech</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-from: #eef2f7;
+            --bg-to: #e5ebf3;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #0f172a;
+            --muted: #64748b;
+            --primary: #4f46e5;
+            --primary-600: #4338ca;
+            --accent: #0ea5e9;
+            --success: #10b981;
+            --danger: #ef4444;
+            --shadow: 0 10px 30px rgba(15, 23, 42, .08);
+            --radius: 16px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(180deg, var(--bg-from) 0%, var(--bg-to) 100%);
+            min-height: 100vh;
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .app {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ---- Top bar ---- */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 16px 22px;
+        }
+
+        .brand { display: flex; align-items: center; gap: 14px; }
+
+        .brand-logo {
+            width: 46px; height: 46px;
+            border-radius: 12px;
+            display: grid; place-items: center;
+            font-size: 24px;
+            background: linear-gradient(135deg, #6366f1, #0ea5e9);
+            box-shadow: 0 6px 16px rgba(79, 70, 229, .35);
+        }
+
+        .brand-text { display: flex; flex-direction: column; }
+        .brand-title { font-size: 20px; font-weight: 800; letter-spacing: -.3px; }
+        .brand-sub { font-size: 13px; font-weight: 500; color: var(--muted); }
+
+        /* ---- Status pill (dot via ::before so JS textContent is safe) ---- */
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            padding: 9px 16px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--muted);
+            max-width: 360px;
+        }
+        .status::before {
+            content: "";
+            width: 9px; height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+            box-shadow: 0 0 0 3px rgba(100, 116, 139, .15);
+            flex: none;
+        }
+        .status.ready { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+        .status.ready::before { background: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, .18); }
+        .status.processing { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+        .status.processing::before { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, .18); }
+        .status.error { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+        .status.error::before { background: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, .18); }
+
+        /* ---- Layout ---- */
+        .layout {
+            display: grid;
+            grid-template-columns: 1.6fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+        .side { display: flex; flex-direction: column; gap: 20px; }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .card-head .card-title { margin-bottom: 0; }
+        .cam-buttons { display: flex; gap: 8px; }
+
+        /* ---- Video ---- */
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #0b1220;
+            border: 1px solid var(--border);
+        }
+        #video, #overlay {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+        #video { object-fit: cover; }
+        #overlay { pointer-events: none; }
+
+        .gesture-badge {
+            position: absolute;
+            left: 14px; top: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, .60);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #fff;
+        }
+        .gesture-name { font-size: 18px; font-weight: 700; letter-spacing: .3px; }
+        .gesture-conf { font-size: 12px; font-weight: 500; opacity: .85; }
+        .gesture-conf strong { font-weight: 700; }
+
+        /* ---- Buttons ---- */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s ease;
+            font-family: inherit;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-600); }
+        .btn-ghost { background: #fff; color: var(--text); border-color: var(--border); }
+        .btn-ghost:hover { background: #f8fafc; }
+        .btn-accent { background: var(--accent); color: #fff; }
+        .btn-accent:hover { filter: brightness(1.05); }
+        .btn-soft { background: #f1f5f9; color: var(--text); }
+        .btn-soft:hover { background: #e2e8f0; }
+        .btn-soft.danger { background: #fef2f2; color: var(--danger); }
+        .btn-soft.danger:hover { background: #fee2e2; }
+
+        /* ---- Text builder ---- */
+        .field { margin-bottom: 14px; }
+        .field-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .6px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+        .field-value {
+            min-height: 46px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            font-size: 16px;
+            font-weight: 600;
+            word-break: break-word;
+        }
+        .field-value.word { letter-spacing: 3px; color: var(--primary); }
+        .field-value.sentence { min-height: 84px; font-weight: 500; line-height: 1.5; }
+
+        .suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 2px 0 16px;
+            min-height: 34px;
+            align-items: center;
+        }
+        .chip {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            padding: 7px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s ease;
+            font-family: inherit;
+        }
+        .chip:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-1px); }
+        .chip.top { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .chip.top:hover { background: var(--primary-600); color: #fff; }
+        .hint { font-size: 13px; font-weight: 500; color: var(--muted); }
+
+        .actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        /* ---- Gesture guide ---- */
+        .legend { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+        .legend li { display: flex; align-items: center; gap: 12px; }
+        .lg-ico {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            display: grid; place-items: center;
+            font-size: 20px;
+            background: #f1f5f9;
+            flex: none;
+        }
+        .legend div { display: flex; flex-direction: column; gap: 2px; }
+        .legend b { font-size: 14px; font-weight: 600; }
+        .legend span { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+
+        .foot { text-align: center; font-size: 12.5px; font-weight: 500; color: var(--muted); padding: 2px 0 6px; }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 900px) {
+            .layout { grid-template-columns: 1fr; }
+            .topbar { flex-direction: column; align-items: flex-start; }
+            .status { max-width: none; }
+        }
+        @media (max-width: 480px) {
+            .app { padding: 14px; }
+            .actions { grid-template-columns: 1fr; }
+            .card-head { flex-direction: column; align-items: flex-start; gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Top bar -->
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-logo">🤟</div>
+                <div class="brand-text">
+                    <span class="brand-title">ASL Detection System</span>
+                    <span class="brand-sub">Real-time Sign Language → Text → Speech</span>
+                </div>
+            </div>
+            <div class="status ready" id="status">Ready — start the camera to begin</div>
+        </header>
+
+        <main class="layout">
+            <!-- Left: camera -->
+            <section class="card camera-card">
+                <div class="card-head">
+                    <h2 class="card-title">🎥 Live Camera</h2>
+                    <div class="cam-buttons">
+                        <button class="btn btn-primary" onclick="startCamera()">Start Camera</button>
+                        <button class="btn btn-ghost" onclick="stopCamera()">Stop</button>
+                    </div>
+                </div>
+                <div class="video-wrapper">
+                    <video id="video" autoplay muted playsinline></video>
+                    <canvas id="overlay"></canvas>
+                    <div class="gesture-badge">
+                        <span class="gesture-name" id="current-gesture">No gesture</span>
+                        <span class="gesture-conf">Confidence <strong id="confidence">0%</strong></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right: builder + guide -->
+            <aside class="side">
+                <section class="card">
+                    <h2 class="card-title">✍️ Text Builder</h2>
+
+                    <div class="field">
+                        <label class="field-label">Current word</label>
+                        <div class="field-value word" id="current-word-display">-</div>
+                    </div>
+
+                    <div class="suggestions" id="suggestions">
+                        <span class="hint">Suggestions appear as you sign…</span>
+                    </div>
+
+                    <div class="field">
+                        <label class="field-label">Sentence</label>
+                        <div class="field-value sentence" id="current-sentence-display">-</div>
+                    </div>
+
+                    <div class="actions">
+                        <button class="btn btn-soft" onclick="addSpace()">␣ Space</button>
+                        <button class="btn btn-soft danger" onclick="deleteChar()">⌫ Delete</button>
+                        <button class="btn btn-accent" onclick="speakText()">🔊 Speak</button>
+                        <button class="btn btn-soft danger" onclick="clearAll()">🗑 Clear</button>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <h2 class="card-title">🖖️ Gesture Guide</h2>
+                    <ul class="legend">
+                        <li><span class="lg-ico">✋</span><div><b>Open palm</b><span>Space / finish the word</span></div></li>
+                        <li><span class="lg-ico">👊</span><div><b>Closed fist</b><span>Delete last letter</span></div></li>
+                        <li><span class="lg-ico">👍</span><div><b>Thumbs-up</b><span>Speak the sentence</span></div></li>
+                        <li><span class="lg-ico">☝️</span><div><b>1 / 2 / 3 fingers</b><span>Pick suggestion #1–#3</span></div></li>
+                        <li><span class="lg-ico">⏸️</span><div><b>Pause</b><span>~2s word · ~4s speak</span></div></li>
+                    </ul>
+                </section>
+            </aside>
+        </main>
+
+        <footer class="foot">Hold a sign steady until the ring fills · works best with good lighting and a plain background</footer>
+    </div>
+
+    <audio id="audio-player" preload="auto"></audio>
+
+    <!-- MediaPipe Hands: real-time hand landmark detection in the browser -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <script>
+        let video, overlay, octx;
+        let hands, camera;
+        let cameraActive = false;
+        let currentWord = '';
+        let currentSentence = '';
+
+        // ---- Server request throttling ----
+        let lastSendTime = 0;
+        let isProcessing = false;
+        const SEND_INTERVAL_MS = 150;
+
+        // ---- Letter stabilization ----
+        let pendingGesture = null;
+        let pendingCount = 0;
+        let lastCommitted = '';
+        let lastCommitTime = 0;
+        const REQUIRED_STABLE = 5;
+        const COMMIT_COOLDOWN_MS = 1100;
+        const MIN_CONFIDENCE = 0.55;
+
+        // ---- Control gesture stabilization (palm / fist / thumbs-up) ----
+        let pendingControl = null;
+        let controlCount = 0;
+        let lastControlTime = 0;
+        const CONTROL_REQUIRED = { SPACE: 10, SPEAK: 12, DELETE: 14 };
+        const CONTROL_COOLDOWN_MS = 1500;
+
+        // ---- Suggestion picker (1/2/3 fingers -> chip 1/2/3, only while suggestions show) ----
+        let pendingSelection = null;
+        let selectionCount = 0;
+        let lastSelectionTime = 0;
+        const SELECTION_REQUIRED = 10;
+        const SELECTION_COOLDOWN_MS = 1500;
+
+        // ---- Auto word/sentence on pause ----
+        let lastHandTime = Date.now();
+        let wordPauseHandled = true;
+        let sentencePauseHandled = true;
+        const WORD_PAUSE_MS = 2000;
+        const SENTENCE_PAUSE_MS = 4000;
+
+        // ---- Autocomplete ----
+        let currentSuggestions = [];
+
+        // ---- Audio (commit beep) ----
+        let audioCtx = null;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            video = document.getElementById('video');
+            overlay = document.getElementById('overlay');
+            octx = overlay.getContext('2d');
+            updateDisplay();
+            renderSuggestions();
+            setupHands();
+            setInterval(pauseTick, 300);
+        });
+
+        function setupHands() {
+            if (typeof Hands === 'undefined') {
+                updateStatus('Detection library failed to load. Check your connection.', 'error');
+                return;
+            }
+            hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.7,
+                minTrackingConfidence: 0.5
+            });
+            hands.onResults(onResults);
+        }
+
+        async function startCamera() {
+            if (cameraActive) return;
+            if (!hands) {
+                updateStatus('Detection not ready yet. Please wait and retry.', 'error');
+                return;
+            }
+            try {
+                updateStatus('Starting camera...', 'processing');
+                camera = new Camera(video, {
+                    onFrame: async () => { await hands.send({ image: video }); },
+                    width: 640,
+                    height: 480
+                });
+                await camera.start();
+                cameraActive = true;
+                lastHandTime = Date.now();
+                updateStatus('Camera active - sign letters, or palm/fist/thumb for controls', 'ready');
+            } catch (error) {
+                console.error('Camera access failed:', error);
+                updateStatus('Camera access denied. Allow camera and try again.', 'error');
+                cameraActive = false;
+            }
+        }
+
+        function stopCamera() {
+            if (!cameraActive) return;
+            if (camera) { camera.stop(); }
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(t => t.stop());
+                video.srcObject = null;
+            }
+            cameraActive = false;
+            octx.clearRect(0, 0, overlay.width, overlay.height);
+            updateStatus('Camera stopped', 'ready');
+            updateGestureDisplay('No gesture detected', 0);
+        }
+
+        // ============================================================
+        //  Main per-frame handler
+        // ============================================================
+        function onResults(results) {
+            if (overlay.width !== (video.videoWidth || 640) ||
+                overlay.height !== (video.videoHeight || 480)) {
+                overlay.width = video.videoWidth || 640;
+                overlay.height = video.videoHeight || 480;
+            }
+
+            octx.clearRect(0, 0, overlay.width, overlay.height);
+
+            if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+                updateGestureDisplay('No hand detected', 0);
+                pendingGesture = null; pendingCount = 0;
+                pendingControl = null; controlCount = 0;
+                pendingSelection = null; selectionCount = 0;
+                return;
+            }
+
+            const landmarks = results.multiHandLandmarks[0];
+            lastHandTime = Date.now();
+            wordPauseHandled = false;
+            sentencePauseHandled = false;
+
+            // Draw the hand skeleton (lines + joints)
+            drawConnectors(octx, landmarks, HAND_CONNECTIONS, { color: '#00FF88', lineWidth: 3 });
+            drawLandmarks(octx, landmarks, { color: '#FF0066', lineWidth: 1, radius: 4 });
+
+            // 1) Control gestures take priority over letters
+            const control = detectControlGesture(landmarks);
+            if (control) {
+                pendingGesture = null; pendingCount = 0;
+                pendingSelection = null; selectionCount = 0;
+                handleControl(control, landmarks);
+                return;
+            }
+            pendingControl = null; controlCount = 0;
+
+            // 1b) Suggestion-picker gestures (only while suggestion chips are visible)
+            const pick = detectSelectionGesture(landmarks);
+            if (pick !== null) {
+                pendingGesture = null; pendingCount = 0;
+                handleSelection(pick, landmarks);
+                return;
+            }
+            pendingSelection = null; selectionCount = 0;
+
+            // 2) Otherwise classify the letter on the server (throttled)
+            const now = Date.now();
+            if (!isProcessing && now - lastSendTime >= SEND_INTERVAL_MS) {
+                lastSendTime = now;
+                const points = landmarks.map(p => [p.x * overlay.width, p.y * overlay.height]);
+                classifyLandmarks(points);
+            }
+
+            // Draw the "letter lock" progress ring
+            drawLockRing(landmarks, pendingCount / REQUIRED_STABLE, '#00FF88', pendingGesture || '');
+        }
+
+        // ============================================================
+        //  Finger geometry helpers
+        // ============================================================
+        function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+        function fingerStates(lm) {
+            // Non-thumb fingers: extended when the tip is above the PIP joint
+            const index  = lm[8].y  < lm[6].y;
+            const middle = lm[12].y < lm[10].y;
+            const ring   = lm[16].y < lm[14].y;
+            const pinky  = lm[20].y < lm[18].y;
+            // Thumb sticks out sideways: tip farther from pinky-MCP than its own MCP
+            const thumbOut = dist(lm[4], lm[17]) > dist(lm[2], lm[17]) * 1.1;
+            // Thumb points up: tip clearly above its MCP, the wrist and the index MCP
+            const thumbUp = lm[4].y < lm[2].y && lm[4].y < lm[0].y && lm[4].y < lm[5].y;
+            return {
+                index, middle, ring, pinky, thumbOut, thumbUp,
+                count: [index, middle, ring, pinky].filter(Boolean).length
+            };
+        }
+
+        function detectControlGesture(lm) {
+            const f = fingerStates(lm);
+            if (f.count >= 4 && f.thumbOut) return 'SPACE';   // open palm
+            if (f.count === 0) {
+                if (f.thumbUp && f.thumbOut) return 'SPEAK';  // thumbs-up
+                return 'DELETE';                              // closed fist
+            }
+            return null;
+        }
+
+        function handleControl(control, landmarks) {
+            const label = { SPACE: '\u270b Space', DELETE: '\u270c Delete', SPEAK: '\ud83d\udd0a Speak' }[control];
+            updateGestureDisplay(label, 1);
+
+            if (control === pendingControl) {
+                controlCount++;
+            } else {
+                pendingControl = control;
+                controlCount = 1;
+            }
+
+            const need = CONTROL_REQUIRED[control] || 12;
+            drawLockRing(landmarks, controlCount / need, '#FF9800', label);
+
+            const now = Date.now();
+            if (controlCount >= need && now - lastControlTime >= CONTROL_COOLDOWN_MS) {
+                lastControlTime = now;
+                controlCount = 0;
+                beep(control === 'DELETE' ? 440 : 880);
+                if (control === 'SPACE') finalizeWord();
+                else if (control === 'DELETE') deleteChar();
+                else if (control === 'SPEAK') finalizeSentenceAndSpeak();
+            }
+        }
+
+        // Detect a suggestion-pick gesture: index=#1, index+middle=#2, index+middle+ring=#3.
+        // Only active when matching suggestion chips actually exist.
+        function detectSelectionGesture(lm) {
+            if (!currentSuggestions.length) return null;
+            const f = fingerStates(lm);
+            if (f.index && !f.middle && !f.ring && !f.pinky) return 0;
+            if (f.index && f.middle && !f.ring && !f.pinky) return currentSuggestions.length >= 2 ? 1 : null;
+            if (f.index && f.middle && f.ring && !f.pinky) return currentSuggestions.length >= 3 ? 2 : null;
+            return null;
+        }
+
+        function handleSelection(idx, landmarks) {
+            const word = currentSuggestions[idx];
+            if (!word) { pendingSelection = null; selectionCount = 0; return; }
+            const label = 'Pick #' + (idx + 1) + ': ' + word;
+            updateGestureDisplay(label, 1);
+
+            if (idx === pendingSelection) {
+                selectionCount++;
+            } else {
+                pendingSelection = idx;
+                selectionCount = 1;
+            }
+
+            drawLockRing(landmarks, selectionCount / SELECTION_REQUIRED, '#2196F3', label);
+
+            const now = Date.now();
+            if (selectionCount >= SELECTION_REQUIRED && now - lastSelectionTime >= SELECTION_COOLDOWN_MS) {
+                lastSelectionTime = now;
+                selectionCount = 0;
+                beep(990);
+                applySuggestion(word);
+            }
+        }
+
+        // ============================================================
+        //  Letter classification + commit
+        // ============================================================
+        async function classifyLandmarks(points) {
+            isProcessing = true;
+            try {
+                const response = await fetch('/process_frame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ landmarks: points })
+                });
+                const result = await response.json();
+                if (result.success && result.gesture) {
+                    updateGestureDisplay(result.gesture, result.confidence);
+                    considerGesture(result.gesture, result.confidence);
+                }
+            } catch (error) {
+                console.error('Processing error:', error);
+            }
+            isProcessing = false;
+        }
+
+        function considerGesture(gesture, confidence) {
+            if (confidence < MIN_CONFIDENCE) { pendingGesture = null; pendingCount = 0; return; }
+
+            if (gesture === pendingGesture) {
+                pendingCount++;
+            } else {
+                pendingGesture = gesture;
+                pendingCount = 1;
+            }
+
+            const now = Date.now();
+            if (pendingCount >= REQUIRED_STABLE) {
+                const isRepeat = gesture === lastCommitted;
+                if (!isRepeat || now - lastCommitTime >= COMMIT_COOLDOWN_MS) {
+                    currentWord += gesture;
+                    lastCommitted = gesture;
+                    lastCommitTime = now;
+                    pendingCount = 0;
+                    beep(660);
+                    updateDisplay();
+                    fetchSuggestions();
+                }
+            }
+        }
+
+        // ============================================================
+        //  Word / sentence finalization
+        // ============================================================
+        function finalizeWord() {
+            if (!currentWord.trim()) return;
+            let w = currentWord;
+            const accepted = autoAccept(w);
+            if (accepted) w = accepted;
+            currentSentence = currentSentence ? currentSentence + ' ' + w : w;
+            currentWord = '';
+            lastCommitted = '';
+            clearSuggestions();
+            updateDisplay();
+        }
+
+        function finalizeSentenceAndSpeak() {
+            finalizeWord();
+            const text = currentSentence.trim();
+            if (!text) return;
+            speakSentence(text);
+            currentSentence = '';
+            updateDisplay();
+        }
+
+        // Accept the top suggestion when the typed prefix isn't itself a word
+        function autoAccept(typed) {
+            const t = typed.toUpperCase();
+            if (!currentSuggestions.length) return null;
+            if (currentSuggestions.includes(t)) return null;   // already a real word
+            const top = currentSuggestions[0];
+            if (t.length >= 2 && top.startsWith(t) && top.length > t.length) return top;
+            return null;
+        }
+
+        // ============================================================
+        //  Autocomplete suggestions
+        // ============================================================
+        async function fetchSuggestions() {
+            const prefix = currentWord.trim();
+            if (!prefix) { clearSuggestions(); return; }
+            try {
+                const response = await fetch('/suggest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prefix })
+                });
+                const result = await response.json();
+                currentSuggestions = result.suggestions || [];
+            } catch (e) {
+                currentSuggestions = [];
+            }
+            renderSuggestions();
+        }
+
+        function clearSuggestions() {
+            currentSuggestions = [];
+            renderSuggestions();
+        }
+
+        function renderSuggestions() {
+            const box = document.getElementById('suggestions');
+            box.innerHTML = '';
+            if (!currentSuggestions.length) {
+                box.innerHTML = '<span class="hint">Suggestions appear as you sign\u2026</span>';
+                return;
+            }
+            currentSuggestions.forEach((w, i) => {
+                const b = document.createElement('button');
+                b.className = 'chip' + (i === 0 ? ' top' : '');
+                b.textContent = w;
+                b.onclick = () => applySuggestion(w);
+                box.appendChild(b);
+            });
+        }
+
+        function applySuggestion(word) {
+            currentWord = word;
+            finalizeWord();
+        }
+
+        // ============================================================
+        //  Pause-based auto word/sentence
+        // ============================================================
+        function pauseTick() {
+            if (!cameraActive) return;
+            const idle = Date.now() - lastHandTime;
+
+            if (!sentencePauseHandled && idle > SENTENCE_PAUSE_MS && (currentSentence || currentWord)) {
+                finalizeSentenceAndSpeak();
+                sentencePauseHandled = true;
+                wordPauseHandled = true;
+            } else if (!wordPauseHandled && idle > WORD_PAUSE_MS && currentWord) {
+                finalizeWord();
+                wordPauseHandled = true;
+            }
+        }
+
+        // ============================================================
+        //  Visual + audio feedback
+        // ============================================================
+        function drawLockRing(lm, progress, color, label) {
+            progress = Math.max(0, Math.min(1, progress));
+            const cx = lm[9].x * overlay.width;
+            const cy = lm[9].y * overlay.height;
+            const r = 46;
+            if (progress > 0) {
+                octx.beginPath();
+                octx.arc(cx, cy, r, 0, 2 * Math.PI);
+                octx.strokeStyle = 'rgba(255,255,255,0.25)';
+                octx.lineWidth = 6;
+                octx.stroke();
+                octx.beginPath();
+                octx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+                octx.strokeStyle = color;
+                octx.lineWidth = 6;
+                octx.lineCap = 'round';
+                octx.stroke();
+            }
+            if (label) {
+                // The canvas is CSS-mirrored, so flip the text back to read normally
+                octx.save();
+                octx.translate(cx, cy - r - 12);
+                octx.scale(-1, 1);
+                octx.fillStyle = color;
+                octx.font = 'bold 22px Segoe UI, sans-serif';
+                octx.textAlign = 'center';
+                octx.fillText(label, 0, 0);
+                octx.restore();
+            }
+        }
+
+        function beep(freq) {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                o.frequency.value = freq;
+                o.type = 'sine';
+                g.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+                o.connect(g); g.connect(audioCtx.destination);
+                o.start(); o.stop(audioCtx.currentTime + 0.12);
+            } catch (e) { /* audio is optional */ }
+        }
+
+        // ============================================================
+        //  Display + manual buttons (kept as a fallback)
+        // ============================================================
+        function updateGestureDisplay(gesture, confidence) {
+            document.getElementById('current-gesture').textContent = gesture;
+            document.getElementById('confidence').textContent = Math.round(confidence * 100) + '%';
+        }
+
+        function addSpace() { finalizeWord(); }
+
+        function deleteChar() {
+            if (currentWord) {
+                currentWord = currentWord.slice(0, -1);
+                fetchSuggestions();
+            } else if (currentSentence) {
+                const words = currentSentence.split(' ');
+                if (words.length > 1) {
+                    currentWord = words.pop();
+                    currentSentence = words.join(' ');
+                } else {
+                    currentWord = currentSentence;
+                    currentSentence = '';
+                }
+                fetchSuggestions();
+            }
+            updateDisplay();
+        }
+
+        function clearAll() {
+            currentWord = '';
+            currentSentence = '';
+            clearSuggestions();
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            document.getElementById('current-word-display').textContent = currentWord || '-';
+            document.getElementById('current-sentence-display').textContent = currentSentence || '-';
+        }
+
+        function speakText() {
+            finalizeWord();
+            const text = currentSentence.trim();
+            if (!text) {
+                updateStatus('No text to speak', 'error');
+                setTimeout(() => updateStatus('Ready', 'ready'), 2000);
+                return;
+            }
+            speakSentence(text);
+        }
+
+        async function speakSentence(textToSpeak) {
+            try {
+                updateStatus('Generating speech...', 'processing');
+                const response = await fetch('/generate_speech', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: textToSpeak, autocorrect: true })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    const spoken = result.text || textToSpeak;
+                    const audio = document.getElementById('audio-player');
+                    audio.src = 'data:audio/mp3;base64,' + result.audio;
+                    audio.onloadeddata = () => {
+                        audio.play();
+                        updateStatus('Speaking: "' + spoken + '"', 'ready');
+                    };
+                    audio.onended = () => updateStatus('Ready', 'ready');
+                } else {
+                    updateStatus('Speech generation failed', 'error');
+                    setTimeout(() => updateStatus('Ready', 'ready'), 2000);
+                }
+            } catch (error) {
+                console.error('Speech error:', error);
+                updateStatus('Speech generation error', 'error');
+                setTimeout(() => updateStatus('Ready', 'ready'), 2000);
+            }
+        }
+
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + type;
+        }
+    </script>
+</body>
+</html>

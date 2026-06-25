@@ -1,0 +1,16 @@
+# Render Blueprint for the ASL Detection web app.
+# Deploy by connecting this repo on https://render.com (New + -> Blueprint).
+services:
+  - type: web
+    name: asl-detection-app
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
